@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hoblera Monitor</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>
+                <span>🖥️</span>
+                Hoblera Monitor
+            </h1>
+            <div class="status">
+                <div class="status-item">
+                    <div class="status-dot"></div>
+                    <span id="uptime">Loading...</span>
+                </div>
+                <button class="refresh-btn" onclick="loadAllData()">🔄 Refresh</button>
+            </div>
+        </div>
+
+        <!-- Top Stats Grid -->
+        <div class="grid">
+            <!-- CPU -->
+            <div class="card">
+                <h2>🔥 CPU Usage</h2>
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <div style="flex: 1;">
+                        <div style="font-size: 18px; font-weight: 700; color: #ffffff; margin-bottom: 5px;"
+                            id="cpu-value">0%</div>
+                        <div style="font-size: 12px; color: #b0b0d0;">Current Usage</div>
+                        <div style="font-size: 14px; color: #a0a0ff; margin-top: 10px;"><span id="cpu-cores">0</span>
+                            Cores</div>
+                    </div>
+                    <div style="width: 120px; height: 120px;">
+                        <canvas id="cpu-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Memory -->
+            <div class="card">
+                <h2>💾 Memory Usage</h2>
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <div style="flex: 1;">
+                        <div style="font-size: 18px; font-weight: 700; color: #ffffff; margin-bottom: 5px;"
+                            id="mem-value">0 GB</div>
+                        <div style="font-size: 12px; color: #b0b0d0;">Used / Total</div>
+                        <div style="font-size: 14px; color: #a0a0ff; margin-top: 10px;"><span id="mem-percent">0</span>%
+                        </div>
+                    </div>
+                    <div style="width: 120px; height: 120px;">
+                        <canvas id="memory-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Media Disk -->
+            <div class="card">
+                <h2>💿 Media Disk</h2>
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <div style="flex: 1;">
+                        <div style="font-size: 12px; color: #b0b0d0; margin-bottom: 5px;" id="media-device">Loading...
+                        </div>
+                        <div style="font-size: 18px; font-weight: 700; color: #ffffff; margin-bottom: 5px;"
+                            id="media-value">0 GB</div>
+                        <div style="font-size: 14px; color: #a0a0ff;">Free: <span id="media-free">0 GB</span></div>
+                    </div>
+                    <div style="width: 120px; height: 120px;">
+                        <canvas id="media-disk-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Network -->
+            <div class="card">
+                <h2>🌐 Network Traffic</h2>
+                <div style="padding: 15px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+                        <div>
+                            <div style="font-size: 12px; color: #b0b0d0;">Sent</div>
+                            <div style="font-size: 18px; font-weight: 700; color: #4CAF50;" id="net-sent">0 GB</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 12px; color: #b0b0d0;">Received</div>
+                            <div style="font-size: 18px; font-weight: 700; color: #2196F3;" id="net-recv">0 GB</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SSH Stats + Alerts -->
+        <div class="grid">
+            <div class="card">
+                <h2>🔐 SSH Activity (24h)</h2>
+                <div class="mini-stat-grid">
+                    <div class="mini-stat" style="background: rgba(76, 175, 80, 0.1); border-color: #4CAF50;">
+                        <div class="mini-stat-value" style="color: #4CAF50;" id="ssh-success">0</div>
+                        <div class="mini-stat-label">Successful</div>
+                    </div>
+                    <div class="mini-stat" style="background: rgba(244, 67, 54, 0.1); border-color: #F44336;">
+                        <div class="mini-stat-value" style="color: #F44336;" id="ssh-failed">0</div>
+                        <div class="mini-stat-label">Failed</div>
+                    </div>
+                    <div class="mini-stat" style="background: rgba(33, 150, 243, 0.1); border-color: #2196F3;">
+                        <div class="mini-stat-value" style="color: #2196F3;" id="ssh-total">0</div>
+                        <div class="mini-stat-label">Total</div>
+                    </div>
+                    <div class="mini-stat" style="background: rgba(156, 39, 176, 0.1); border-color: #9C27B0;">
+                        <div class="mini-stat-value" style="color: #9C27B0;" id="ssh-unique">0</div>
+                        <div class="mini-stat-label">Unique IPs</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>⚠️ Active Alerts</h2>
+                <div id="alerts-container"></div>
+            </div>
+        </div>
+
+        <!-- Separate CPU & Memory Charts -->
+        <div class="grid">
+            <div class="card">
+                <h2>📊 CPU History (24h)</h2>
+                <div class="chart-container">
+                    <canvas id="cpu-history-chart"></canvas>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>📊 Memory History (24h)</h2>
+                <div class="chart-container">
+                    <canvas id="memory-history-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- SSH Timeline -->
+        <!-- SSH Timeline -->
+        <!-- SSH & Network Grid -->
+        <div class="grid">
+            <div class="card">
+                <h2>📈 SSH Login Timeline (24h)</h2>
+                <div class="chart-container">
+                    <canvas id="ssh-timeline-chart"></canvas>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>🌐 Network Utilization (MB/s)</h2>
+                <div class="chart-container">
+                    <canvas id="network-history-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Django Applications & Banned IPs -->
+        <div class="grid">
+            <div class="card">
+                <h2>🚀 Applications (Django / Flask)</h2>
+                <table id="django-apps-table">
+                    <thead>
+                        <tr>
+                            <th>Application</th>
+                            <th>Service</th>
+                            <th>Status</th>
+                            <th>Metrics</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <div class="card">
+                <h2>⛔ Banned IPs (Fail2Ban)</h2>
+                <div id="banned-ips-container" style="max-height: 200px; overflow-y: auto;">
+                    <table id="banned-ips-table">
+                        <thead>
+                            <tr>
+                                <th>IP Address</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Services - Compact -->
+        <div class="grid">
+            <div class="card">
+                <h2>⚙️ System Services</h2>
+                <table id="services-table">
+                    <thead>
+                        <tr>
+                            <th>Service</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <!-- Disk Partitions - Compact -->
+            <div class="card">
+                <h2>💾 Disk Partitions</h2>
+                <table id="partitions-table">
+                    <thead>
+                        <tr>
+                            <th>Mount</th>
+                            <th>Used / Total</th>
+                            <th>%</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <style>
+            .f2b-config-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 20px;
+                margin-top: 15px;
+            }
+
+            .form-group {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .form-group label {
+                font-size: 13px;
+                color: #b0b0d0;
+                font-weight: 500;
+            }
+
+            .form-group input {
+                background: rgba(26, 26, 62, 0.5);
+                border: 1px solid #2a2a4e;
+                padding: 10px;
+                border-radius: 8px;
+                color: #ffffff;
+                font-family: 'Inter', sans-serif;
+                font-size: 14px;
+                outline: none;
+                transition: all 0.3s;
+            }
+
+            .form-group input:focus {
+                border-color: #667eea;
+                box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+            }
+
+            .form-group small {
+                font-size: 11px;
+                color: #666;
+            }
+
+            .btn {
+                padding: 10px 20px;
+                border: none;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 600;
+                font-size: 14px;
+                transition: all 0.3s;
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .btn-primary {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+            }
+
+            .btn-primary:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            }
+
+            .btn:disabled {
+                opacity: 0.7;
+                cursor: not-allowed;
+                transform: none;
+            }
+        </style>
+
+        <!-- Fail2Ban Management -->
+        <div class="grid">
+            <!-- Empty placeholder for future use (Left 50%) -->
+            <div class="card" style="visibility: hidden; border: none; background: transparent; box-shadow: none;">
+            </div>
+
+            <div class="card">
+                <h2>🛡️ Fail2Ban Configuration (Slow Attack Protection)</h2>
+                <div class="f2b-config-grid">
+                    <div class="form-group">
+                        <label>Ban Time (Hours)</label>
+                        <input type="number" id="f2b-bantime" step="0.1">
+                        <small>Duration of ban in hours</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Find Time (Minutes)</label>
+                        <input type="number" id="f2b-findtime" step="1">
+                        <small>Time window to count failures</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Max Retry (Count)</label>
+                        <input type="number" id="f2b-maxretry" step="1">
+                        <small>Failures allowed before ban</small>
+                    </div>
+                </div>
+                <div class="action-buttons" style="margin-top: 25px; display: flex; justify-content: flex-end;">
+                    <button class="btn btn-primary" onclick="saveAndApplyFail2Ban()">
+                        <span>💾</span> Save & Apply Configuration
+                    </button>
+                </div>
+                <div id="f2b-message" style="margin-top: 15px; font-size: 13px; text-align: right; min-height: 20px;">
+                </div>
+            </div>
+        </div>
+
+        <!-- Top IPs & Trusted Hosts -->
+        <div class="grid">
+            <div class="card">
+                <h2>🌍 Top IP Addresses (7 days)</h2>
+                <table id="top-ips-table">
+                    <thead>
+                        <th>Host / IP</th>
+                        <th>Users</th>
+                        <th style="width: 40%;">Activity (Success / Failed)</th>
+                        <th>Last Seen</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <div class="card">
+                <h2>☁️ Trusted Hosts (24h)</h2>
+                <table id="trusted-hosts-table">
+                    <thead>
+                        <th>Host / IP</th>
+                        <th>Users</th>
+                        <th style="width: 40%;">Activity (Success / Failed)</th>
+                        <th>Last Seen</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Recent Logs Split -->
+        <div class="grid">
+            <div class="card">
+                <h2>❌ Recent Failed Logins</h2>
+                <div class="logs-container" id="recent-logs-failed"></div>
+            </div>
+            <div class="card">
+                <h2>✅ Recent Successful Logins</h2>
+                <div class="logs-container" id="recent-logs-success"></div>
+            </div>
+        </div>
+
+        <!-- Top Processes -->
+        <div class="grid">
+            <div class="card">
+                <h2>🔥 Top Processes (CPU)</h2>
+                <table id="processes-cpu-table">
+                    <thead>
+                        <tr>
+                            <th>PID</th>
+                            <th>Name</th>
+                            <th>User</th>
+                            <th>CPU %</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <div class="card">
+                <h2>💾 Top Processes (Memory)</h2>
+                <table id="processes-mem-table">
+                    <thead>
+                        <tr>
+                            <th>PID</th>
+                            <th>Name</th>
+                            <th>User</th>
+                            <th>MEM %</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let sshTimelineChart, cpuHistoryChart, memoryHistoryChart, networkHistoryChart;
+        let cpuDoughnutChart, memoryDoughnutChart, mediaDiskChart;
+
+        function loadAllData() {
+            loadStats();
+            loadSSHTimeline();
+            loadSystemHistory();
+            loadTopIPs();
+            loadTrustedHosts();
+            loadRecentLogs();
+            loadAlerts();
+            loadServices();
+            loadPartitions();
+            loadTopProcesses();
+            loadApps();
+            loadBannedIps();
+            loadApps();
+            loadBannedIps();
+            loadFail2BanConfig();
+        }
+
+        async function loadFail2BanConfig() {
+            try {
+                const res = await fetch('/api/fail2ban/config');
+                const data = await res.json();
+
+                // Convert seconds to readable units
+                // Bantime: Seconds -> Hours
+                const bantimeHours = (parseInt(data.bantime) / 3600).toFixed(1);
+                // Findtime: Seconds -> Minutes
+                const findtimeMins = (parseInt(data.findtime) / 60).toFixed(0);
+
+                // Only update if not focused to avoid overwriting user input while typing
+                if (document.activeElement.id !== 'f2b-bantime') document.getElementById('f2b-bantime').value = parseFloat(bantimeHours);
+                if (document.activeElement.id !== 'f2b-findtime') document.getElementById('f2b-findtime').value = findtimeMins;
+                if (document.activeElement.id !== 'f2b-maxretry') document.getElementById('f2b-maxretry').value = data.maxretry;
+            } catch (e) {
+                console.error("Failed to load F2B config", e);
+            }
+        }
+
+        async function saveAndApplyFail2Ban() {
+            const btn = document.querySelector('button[onclick="saveAndApplyFail2Ban()"]');
+            const msg = document.getElementById('f2b-message');
+
+            // Convert inputs back to seconds
+            const bantimeHours = parseFloat(document.getElementById('f2b-bantime').value);
+            const findtimeMins = parseFloat(document.getElementById('f2b-findtime').value);
+            const maxretry = parseInt(document.getElementById('f2b-maxretry').value);
+
+            const payload = {
+                bantime: Math.round(bantimeHours * 3600),
+                findtime: Math.round(findtimeMins * 60),
+                maxretry: maxretry
+            };
+
+            btn.disabled = true;
+            btn.innerHTML = '<span>⏳</span> Processing...';
+            msg.textContent = 'Saving configuration...';
+            msg.className = '';
+            msg.style.color = '#b0b0d0';
+
+            try {
+                // 1. Save Config
+                const resSave = await fetch('/api/fail2ban/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!resSave.ok) throw new Error("Failed to save config");
+
+                msg.textContent = 'Configuration saved. Reloading service...';
+
+                // 2. Reload Service (No confirmation popup)
+                const resReload = await fetch('/api/fail2ban/reload', { method: 'POST' });
+                const dataReload = await resReload.json();
+
+                if (resReload.ok) {
+                    msg.innerHTML = '✓ <strong>Success!</strong> Configuration saved and Fail2Ban reloaded.';
+                    msg.style.color = '#4CAF50';
+                } else {
+                    throw new Error(dataReload.message || "Reload failed");
+                }
+            } catch (e) {
+                msg.textContent = 'Error: ' + e.message;
+                msg.style.color = '#F44336';
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = '<span>💾</span> Save & Apply Configuration';
+        }
+
+        async function reloadFail2Ban() {
+            // Deprecated/Merged
+        }
+
+        function timeAgo(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const seconds = Math.floor((now - date) / 1000);
+
+            let interval = seconds / 31536000;
+            if (interval > 1) return Math.floor(interval) + " years ago";
+            interval = seconds / 2592000;
+            if (interval > 1) return Math.floor(interval) + " months ago";
+            interval = seconds / 86400;
+            if (interval > 1) return Math.floor(interval) + " days ago";
+            interval = seconds / 3600;
+            if (interval > 1) return Math.floor(interval) + " hours ago";
+            interval = seconds / 60;
+            if (interval > 1) return Math.floor(interval) + " mins ago";
+            return Math.floor(seconds) + " seconds ago";
+        }
+
+        function createDoughnutChart(canvasId, percent, color) {
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return null;
+
+            return new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    datasets: [{
+                        data: [percent, 100 - percent],
+                        backgroundColor: [color, 'rgba(255, 255, 255, 0.1)'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    cutout: '75%',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { enabled: false }
+                    }
+                }
+            });
+        }
+
+        async function loadStats() {
+            const res = await fetch('/api/stats');
+            const data = await res.json();
+
+            // SSH
+            document.getElementById('ssh-success').textContent = data.ssh.successful || 0;
+            document.getElementById('ssh-failed').textContent = data.ssh.failed || 0;
+            document.getElementById('ssh-total').textContent = data.ssh.total || 0;
+            document.getElementById('ssh-unique').textContent = data.ssh.unique_ips || 0;
+
+            // CPU
+            const cpuPercent = data.system.cpu_percent;
+            document.getElementById('cpu-value').textContent = cpuPercent.toFixed(1) + '%';
+            document.getElementById('cpu-cores').textContent = data.system.cpu_count;
+
+            if (cpuDoughnutChart) cpuDoughnutChart.destroy();
+            const cpuColor = cpuPercent > 90 ? '#F44336' : cpuPercent > 75 ? '#FF9800' : '#667eea';
+            cpuDoughnutChart = createDoughnutChart('cpu-chart', cpuPercent, cpuColor);
+
+            // Memory
+            const memPercent = data.system.memory_percent;
+            document.getElementById('mem-value').textContent = data.system.memory_used_gb + ' / ' + data.system.memory_total_gb + ' GB';
+            document.getElementById('mem-percent').textContent = memPercent.toFixed(1);
+
+            if (memoryDoughnutChart) memoryDoughnutChart.destroy();
+            const memColor = memPercent > 90 ? '#F44336' : memPercent > 75 ? '#FF9800' : '#764ba2';
+            memoryDoughnutChart = createDoughnutChart('memory-chart', memPercent, memColor);
+
+            // Network (convert to GB)
+            document.getElementById('net-sent').textContent = (data.system.network_sent_mb / 1024).toFixed(2) + ' GB';
+            document.getElementById('net-recv').textContent = (data.system.network_recv_mb / 1024).toFixed(2) + ' GB';
+            document.getElementById('uptime').textContent = 'Uptime: ' + data.system.uptime_human;
+
+            // Media Disk
+            if (data.system.media_disk) {
+                const md = data.system.media_disk;
+                document.getElementById('media-device').textContent = md.device + ' → ' + md.mountpoint;
+                document.getElementById('media-value').textContent = md.used_gb + ' / ' + md.total_gb + ' GB';
+                document.getElementById('media-free').textContent = md.free_gb + ' GB';
+
+                if (mediaDiskChart) mediaDiskChart.destroy();
+                const diskColor = md.percent > 90 ? '#F44336' : md.percent > 75 ? '#FF9800' : '#f093fb';
+                mediaDiskChart = createDoughnutChart('media-disk-chart', md.percent, diskColor);
+            }
+        }
+
+        async function loadSSHTimeline() {
+            const res = await fetch('/api/ssh_timeline');
+            const data = await res.json();
+
+            const hours = [...new Set(data.map(d => d.hour))].sort();
+            const accepted = hours.map(h => data.find(d => d.hour === h && d.status === 'accepted')?.count || 0);
+            const failed = hours.map(h => data.find(d => d.hour === h && d.status === 'failed')?.count || 0);
+            const invalid = hours.map(h => data.find(d => d.hour === h && d.status === 'invalid')?.count || 0);
+
+            if (sshTimelineChart) sshTimelineChart.destroy();
+
+            sshTimelineChart = new Chart(document.getElementById('ssh-timeline-chart'), {
+                type: 'line',
+                data: {
+                    labels: hours.map(h => new Date(h).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })),
+                    datasets: [
+                        { label: 'Successful', data: accepted, borderColor: '#4CAF50', backgroundColor: 'rgba(76, 175, 80, 0.1)', fill: true, tension: 0.4 },
+                        { label: 'Failed', data: failed, borderColor: '#F44336', backgroundColor: 'rgba(244, 67, 54, 0.1)', fill: true, tension: 0.4 },
+                        { label: 'Invalid', data: invalid, borderColor: '#FF9800', backgroundColor: 'rgba(255, 152, 0, 0.1)', fill: true, tension: 0.4 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top', labels: { color: '#a0a0ff' } } },
+                    scales: {
+                        y: { ticks: { color: '#a0a0ff' }, grid: { color: 'rgba(160, 160, 255, 0.1)' } },
+                        x: { ticks: { color: '#a0a0ff' }, grid: { color: 'rgba(160, 160, 255, 0.1)' } }
+                    }
+                }
+            });
+        }
+
+        async function loadSystemHistory() {
+            const res = await fetch('/api/system_history');
+            const data = await res.json();
+
+            const timestamps = data.map(d => new Date(d.timestamp).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }));
+            const cpu = data.map(d => d.cpu_percent);
+            const memory = data.map(d => d.memory_percent);
+
+            // Network calculation (KB/s)
+            let netSentRate = [];
+            let netRecvRate = [];
+
+            for (let i = 1; i < data.length; i++) {
+                const t1 = new Date(data[i - 1].timestamp).getTime();
+                const t2 = new Date(data[i].timestamp).getTime();
+                const dt = (t2 - t1) / 1000; // seconds
+
+                if (dt > 0 && data[i].net_sent_bytes > 0) {
+                    // Sent rate
+                    let sentDiff = data[i].net_sent_bytes - data[i - 1].net_sent_bytes;
+                    if (sentDiff < 0) sentDiff = 0; // reboot reset
+                    netSentRate.push((sentDiff / dt / 1024 / 1024).toFixed(2));
+
+                    // Recv rate
+                    let recvDiff = data[i].net_recv_bytes - data[i - 1].net_recv_bytes;
+                    if (recvDiff < 0) recvDiff = 0;
+                    netRecvRate.push((recvDiff / dt / 1024 / 1024).toFixed(2));
+                } else {
+                    netSentRate.push(0);
+                    netRecvRate.push(0);
+                }
+            }
+            // Align labels (remove first)
+            const netTimestamps = timestamps.slice(1);
+
+            if (cpuHistoryChart) cpuHistoryChart.destroy();
+            cpuHistoryChart = new Chart(document.getElementById('cpu-history-chart'), {
+                type: 'line',
+                data: {
+                    labels: timestamps,
+                    datasets: [{ label: 'CPU %', data: cpu, borderColor: '#667eea', backgroundColor: 'rgba(102, 126, 234, 0.2)', fill: true, tension: 0.4 }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#a0a0ff' } } },
+                    scales: {
+                        y: { beginAtZero: true, max: 100, ticks: { color: '#a0a0ff' }, grid: { color: 'rgba(160, 160, 255, 0.1)' } },
+                        x: { ticks: { color: '#a0a0ff' }, grid: { color: 'rgba(160, 160, 255, 0.1)' } }
+                    }
+                }
+            });
+
+            if (memoryHistoryChart) memoryHistoryChart.destroy();
+            memoryHistoryChart = new Chart(document.getElementById('memory-history-chart'), {
+                type: 'line',
+                data: {
+                    labels: timestamps,
+                    datasets: [{ label: 'Memory %', data: memory, borderColor: '#764ba2', backgroundColor: 'rgba(118, 75, 162, 0.2)', fill: true, tension: 0.4 }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#a0a0ff' } } },
+                    scales: {
+                        y: { beginAtZero: true, max: 100, ticks: { color: '#a0a0ff' }, grid: { color: 'rgba(160, 160, 255, 0.1)' } },
+                        x: { ticks: { color: '#a0a0ff' }, grid: { color: 'rgba(160, 160, 255, 0.1)' } }
+                    }
+                }
+            });
+
+            if (networkHistoryChart) networkHistoryChart.destroy();
+            networkHistoryChart = new Chart(document.getElementById('network-history-chart'), {
+                type: 'line',
+                data: {
+                    labels: netTimestamps,
+                    datasets: [
+                        { label: 'Upload (MB/s)', data: netSentRate, borderColor: '#FF9800', backgroundColor: 'rgba(255, 152, 0, 0.1)', fill: true, tension: 0.4 },
+                        { label: 'Download (MB/s)', data: netRecvRate, borderColor: '#4CAF50', backgroundColor: 'rgba(76, 175, 80, 0.1)', fill: true, tension: 0.4 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#a0a0ff' } } },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { color: '#a0a0ff' }, grid: { color: 'rgba(160, 160, 255, 0.1)' } },
+                        x: { ticks: { color: '#a0a0ff' }, grid: { color: 'rgba(160, 160, 255, 0.1)' } }
+                    }
+                }
+            });
+        }
+
+        function renderIpRow(ip) {
+            // Process users
+            let userList = (ip.usernames || '').split(',');
+            let userCount = userList.length;
+            if (ip.usernames === null || ip.usernames === '') userCount = 0;
+
+            // Activity Text Logic
+            let activityHtml = '';
+            if (ip.failed === 0) {
+                activityHtml = `<span style="color: #4CAF50; font-weight: 600;">All logins successful (${ip.successful})</span>`;
+            } else if (ip.successful === 0) {
+                activityHtml = `<span style="color: #F44336; font-weight: 600;">All logins failed (${ip.failed})</span>`;
+            } else {
+                activityHtml = `
+                    <span style="color: #4CAF50;">${ip.successful} success</span> / 
+                    <span style="color: #F44336;">${ip.failed} failed</span>
+                    `;
+            }
+
+            return `
+            <tr>
+                <td>
+                    <div class="ip-cell-primary">${ip.dns_name ? ip.dns_name : ip.ip_address}</div>
+                    ${ip.dns_name ? `<div class="ip-cell-secondary">${ip.ip_address}</div>` : ''}
+                </td>
+                <td>
+                    ${userCount > 0 ? `
+                    <div class="user-count-badge" title="${ip.usernames}">
+                        <span>👤</span> ${userCount}
+                    </div>
+                    ` : '<span style="color:#666">-</span>'}
+                </td>
+                <td>
+                    ${activityHtml}
+                </td>
+                <td style="font-size: 12px; color: #aaa;">
+                    ${timeAgo(ip.last_seen)}
+                </td>
+            </tr>
+            `;
+        }
+
+        async function loadTopIPs() {
+            const res = await fetch('/api/top_ips');
+            const data = await res.json();
+            document.querySelector('#top-ips-table tbody').innerHTML = data.map(renderIpRow).join('');
+        }
+
+        async function loadTrustedHosts() {
+            const res = await fetch('/api/trusted_hosts');
+            const data = await res.json();
+            document.querySelector('#trusted-hosts-table tbody').innerHTML = data.map(renderIpRow).join('');
+        }
+
+        async function loadRecentLogs() {
+            const res = await fetch('/api/recent_logs');
+            const data = await res.json();
+
+            // Split logs
+            const failedLogs = data.filter(log => log.status === 'failed' || log.status === 'invalid');
+            const successLogs = data.filter(log => log.status === 'accepted');
+
+            const renderLog = (log) => `
+            <div class="log-entry log-${log.status}">
+                <div>
+                    <strong>${log.username}@${log.ip_address}</strong>
+                    ${log.dns_name ? `<span style="color: #888; font-size: 11px;">(${log.dns_name})</span>` : ''}
+                    <span class="badge badge-${log.status === 'accepted' ? 'success' : 'danger'}">${log.status}</span>
+                </div>
+                <div style="font-size: 12px; color: #999;">${new Date(log.timestamp).toLocaleString('pl-PL')}</div>
+            </div>
+            `;
+
+            document.getElementById('recent-logs-failed').innerHTML = failedLogs.slice(0, 50).map(renderLog).join('');
+            document.getElementById('recent-logs-success').innerHTML = successLogs.slice(0, 50).map(renderLog).join('');
+        }
+
+        async function loadAlerts() {
+            const res = await fetch('/api/alerts');
+            const data = await res.json();
+
+            const container = document.getElementById('alerts-container');
+            if (data.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 20px; color: #4CAF50;">✓ No active alerts</div>';
+            } else {
+                container.innerHTML = data.slice(0, 5).map(alert => `
+                    <div class="alert ${alert.severity === 'critical' ? 'alert-danger' : ''}">
+                        <strong>${alert.alert_type}:</strong> ${alert.message}
+                        <div style="font-size: 12px; color: #999; margin-top: 5px;">${new Date(alert.created_at).toLocaleString('pl-PL')}</div>
+                    </div>
+                `).join('');
+            }
+        }
+
+        async function loadServices() {
+            const res = await fetch('/api/systemd_services');
+            const data = await res.json();
+
+            const tbody = document.querySelector('#services-table tbody');
+            tbody.innerHTML = data.map(svc => `
+            <tr>
+                <td><strong>${svc.name}</strong></td>
+                <td>
+                    <div class="service-status">
+                        <div class="service-dot ${svc.active ? 'active' : 'inactive'}"></div>
+                        ${svc.status}
+                    </div>
+                </td>
+            </tr>
+            `).join('');
+        }
+
+        async function loadPartitions() {
+            const res = await fetch('/api/disk_partitions');
+            const data = await res.json();
+
+            const tbody = document.querySelector('#partitions-table tbody');
+            tbody.innerHTML = data.map(part => `
+            <tr>
+                <td><strong>${part.mountpoint}</strong></td>
+                <td>${part.used_gb} / ${part.total_gb} GB</td>
+                <td>
+                    <div class="progress-bar">
+                        <div class="progress-fill ${part.percent > 90 ? 'danger' : part.percent > 75 ? 'warning' : ''}"
+                            style="width: ${part.percent}%"></div>
+                    </div>
+                    ${part.percent.toFixed(1)}%
+                </td>
+            </tr>
+            `).join('');
+        }
+
+        async function loadTopProcesses() {
+            const res = await fetch('/api/top_processes');
+            const data = await res.json();
+
+            const cpuTbody = document.querySelector('#processes-cpu-table tbody');
+            cpuTbody.innerHTML = data.by_cpu.slice(0, 10).map(proc => `
+            <tr>
+                <td>${proc.pid}</td>
+                <td><strong>${proc.name}</strong></td>
+                <td>${proc.username}</td>
+                <td>${(proc.cpu_percent || 0).toFixed(1)}%</td>
+            </tr>
+            `).join('');
+
+            const memTbody = document.querySelector('#processes-mem-table tbody');
+            memTbody.innerHTML = data.by_memory.slice(0, 10).map(proc => `
+            <tr>
+                <td>${proc.pid}</td>
+                <td><strong>${proc.name}</strong></td>
+                <td>${proc.username}</td>
+                <td>${(proc.memory_percent || 0).toFixed(1)}%</td>
+            </tr>
+            `).join('');
+        }
+
+        async function loadApps() {
+            const res = await fetch('/api/apps');
+            const data = await res.json();
+
+            const tbody = document.querySelector('#django-apps-table tbody');
+            tbody.innerHTML = data.map(app => `
+            <tr>
+                <td>
+                    <strong>${app.name}</strong> <span style="font-size: 10px; color: #888; border: 1px solid #444; padding: 1px 4px; border-radius: 4px;">${app.type}</span><br>
+                    <span style="font-size: 11px; color: #999;">${app.url}</span>
+                </td>
+                <td>
+                    <div class="service-status">
+                        <div class="service-dot ${app.service_active ? 'active' : 'inactive'}"></div>
+                        ${app.service}
+                    </div>
+                </td>
+                <td>
+                    ${app.http_ok
+                    ? '<span class="badge badge-success">Online</span>'
+                    : '<span class="badge badge-danger">Offline</span>'}
+                </td>
+                <td style="font-size: 11px;">
+                    ${app.response_time_ms ? `Ping: ${app.response_time_ms}ms` : ''}
+                    ${app.process ? `<br>CPU: ${app.process.cpu_percent}%` : ''}
+                </td>
+            </tr>
+            `).join('');
+        }
+
+        async function loadBannedIps() {
+            try {
+                const res = await fetch('/api/banned_ips');
+                const data = await res.json();
+
+                const tbody = document.querySelector('#banned-ips-table tbody');
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:#666;">No banned IPs</td></tr>';
+                } else {
+                    tbody.innerHTML = data.map(entry => `
+                    <tr>
+                        <td style="font-family: monospace; font-size: 13px;">${entry.ip}</td>
+                        <td><span class="badge badge-danger">Banned</span></td>
+                    </tr>
+                    `).join('');
+                }
+            } catch (e) {
+                console.error("Failed to load banned IPs", e);
+            }
+        }
+
+        loadAllData();
+        setInterval(loadAllData, 30000);
+    </script>
+</body>
+
+</html>

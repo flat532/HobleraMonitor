@@ -1,0 +1,10 @@
+[DEFAULT]
+bantime = 216000
+findtime = 10800
+maxretry = 5
+
+[sshd]
+enabled = true
+action = %(action_)s
+	hoblera-alert
+
