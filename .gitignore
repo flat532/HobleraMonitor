@@ -25,5 +25,5 @@ Thumbs.db
 .idea/
 
 # Secrets
-config.py
+# config.py
 .env.local
