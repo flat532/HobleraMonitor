@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Hoblera Monitor Metrics Collector every 5 minutes
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=5min
+Unit=hoblera-metrics.service
+
+[Install]
+WantedBy=timers.target

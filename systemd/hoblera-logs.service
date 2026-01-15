@@ -1,0 +1,13 @@
+[Unit]
+Description=Hoblera Monitor Log Parser
+After=network.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/www/HobleraMonitor
+Environment="PATH=/www/HobleraMonitor/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/www/HobleraMonitor/venv/bin/python /www/HobleraMonitor/log_parser.py
+
+[Install]
+WantedBy=multi-user.target

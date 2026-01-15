@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Hoblera Monitor Log Parser every 1 minute
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+Unit=hoblera-logs.service
+
+[Install]
+WantedBy=timers.target

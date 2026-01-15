@@ -1,0 +1,13 @@
+[Unit]
+Description=Hoblera Monitor Metrics Collector
+After=network.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/www/HobleraMonitor
+Environment="PATH=/www/HobleraMonitor/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/www/HobleraMonitor/venv/bin/python /www/HobleraMonitor/metrics_collector.py
+
+[Install]
+WantedBy=multi-user.target
