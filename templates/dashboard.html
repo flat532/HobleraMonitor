@@ -429,8 +429,6 @@
             loadTopProcesses();
             loadApps();
             loadBannedIps();
-            loadApps();
-            loadBannedIps();
             loadFail2BanConfig();
         }
 
@@ -529,6 +527,10 @@
         }
 
         function createDoughnutChart(canvasId, percent, color) {
+            if (typeof Chart === 'undefined') {
+                console.warn('Chart.js not loaded');
+                return null;
+            }
             const ctx = document.getElementById(canvasId);
             if (!ctx) return null;
 
