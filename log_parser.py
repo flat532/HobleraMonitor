@@ -1,3 +1,4 @@
+import os
 import subprocess
 import json
 import re
@@ -265,6 +266,88 @@ def parse_ssh_log():
     print(f"Parsed {new_entries} new SSH log entries from auth.log")
     return new_entries
 
+def parse_macos_log():
+    """Parsuj /var/log/system.log (macOS format)"""
+    log_file = '/var/log/system.log'
+    if not Path(log_file).exists():
+        return 0
+        
+    print(f"Parsing macOS log: {log_file}")
+    conn = sqlite3.connect(Config.DB_FILE)
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT MAX(timestamp) FROM ssh_logs")
+    res = cursor.fetchone()
+    last_ts = res[0] if res else None
+    
+    # Regex for BSD syslog format: Jan 15 08:29:05 hostname process[pid]: message
+    # We look for 'sshd' pattern
+    patterns = {
+        'accepted_password': re.compile(
+            r'^([A-Z][a-z]{2}\s+\d+\s\d{2}:\d{2}:\d{2}).*sshd\[\d+\]: Accepted password for (\w+) from ([\da-fA-F:.%]+) port (\d+)'
+        ),
+        'accepted_publickey': re.compile(
+            r'^([A-Z][a-z]{2}\s+\d+\s\d{2}:\d{2}:\d{2}).*sshd\[\d+\]: Accepted publickey for (\w+) from ([\da-fA-F:.%]+) port (\d+)'
+        ),
+        'failed': re.compile(
+            r'^([A-Z][a-z]{2}\s+\d+\s\d{2}:\d{2}:\d{2}).*sshd\[\d+\]: Failed password for (?:invalid user )?(\w+) from ([\da-fA-F:.%]+) port (\d+)'
+        ),
+        'invalid': re.compile(
+            r'^([A-Z][a-z]{2}\s+\d+\s\d{2}:\d{2}:\d{2}).*sshd\[\d+\]: Invalid user (\w+) from ([\da-fA-F:.%]+) port (\d+)'
+        )
+    }
+    
+    new_entries = 0
+    current_year = datetime.now().year
+    
+    try:
+        # Check permission (might need sudo)
+        if not os.access(log_file, os.R_OK):
+             print(f"Warning: No read permission for {log_file}")
+             return 0
+
+        with open(log_file, 'r') as f:
+            for line in f:
+                if 'sshd' not in line: continue
+                
+                for status, pattern in patterns.items():
+                    match = pattern.search(line)
+                    if match:
+                        ts_str = match.group(1)
+                        username = match.group(2)
+                        ip = match.group(3)
+                        port = match.group(4)
+                        
+                        try:
+                            # Parse "Jan  1 00:01:22" -> needs year
+                            # Try to be smart about year boundary? For now assume current year.
+                            # Adjust for cases where log is Dec and now is Jan?
+                            dt = datetime.strptime(f"{current_year} {ts_str}", "%Y %b %d %H:%M:%S")
+                            
+                            # If dt is in future (e.g. log is Jan, current is Dec?), subtract year
+                            if dt > datetime.now() + timedelta(days=1):
+                                dt = dt.replace(year=current_year - 1)
+                                
+                            if last_ts and dt.strftime("%Y-%m-%d %H:%M:%S") <= last_ts:
+                                continue
+                                
+                            final_status = 'accepted' if 'accepted' in status else status
+                            
+                            cursor.execute('''
+                                INSERT INTO ssh_logs (timestamp, username, ip_address, dns_name, port, status, message)
+                                VALUES (?, ?, ?, ?, ?, ?, ?)
+                            ''', (dt, username, ip, None, port, final_status, line.strip()))
+                            new_entries += 1
+                        except Exception as e:
+                            pass
+    except Exception as e:
+        print(f"Error parsing system.log: {e}")
+        
+    conn.commit()
+    conn.close()
+    print(f"Parsed {new_entries} new entries from system.log")
+    return new_entries
+
 def check_anomalies():
     """Sprawdź anomalie i generuj alerty"""
     conn = sqlite3.connect(Config.DB_FILE)
@@ -303,7 +386,11 @@ def check_anomalies():
 
 def main():
     init_db()
-    parse_ssh_log()
+    import platform
+    if platform.system() == 'Darwin':
+        parse_macos_log()
+    else:
+        parse_ssh_log()
     check_anomalies()
 
 if __name__ == "__main__":
