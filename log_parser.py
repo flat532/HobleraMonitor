@@ -275,7 +275,7 @@ def check_anomalies():
         SELECT COUNT(*), ip_address 
         FROM ssh_logs 
         WHERE status IN ('failed', 'invalid') 
-        AND timestamp > datetime('now', '-1 hour')
+        AND timestamp > datetime('now', 'localtime', '-1 hour')
         GROUP BY ip_address
         HAVING COUNT(*) > ?
     ''', (Config.MAX_FAILED_LOGINS_PER_HOUR,))
@@ -288,7 +288,7 @@ def check_anomalies():
             SELECT id FROM alerts 
             WHERE alert_type = 'failed_login' 
             AND details = ?
-            AND created_at > datetime('now', '-1 hour')
+            AND created_at > datetime('now', 'localtime', '-1 hour')
         ''', (ip,))
         
         if not cursor.fetchone():

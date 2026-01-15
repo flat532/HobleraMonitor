@@ -57,21 +57,21 @@ def api_stats():
             SUM(CASE WHEN status = 'accepted' THEN 1 ELSE 0 END) as successful,
             SUM(CASE WHEN status IN ('failed', 'invalid') THEN 1 ELSE 0 END) as failed
         FROM ssh_logs
-        WHERE timestamp > datetime('now', '-1 day')
+        WHERE timestamp > datetime('now', 'localtime', '-1 day')
     ''')
     ssh_stats = dict(cursor.fetchone())
     
     cursor.execute('''
         SELECT COUNT(DISTINCT ip_address) as unique_ips
         FROM ssh_logs
-        WHERE timestamp > datetime('now', '-1 day')
+        WHERE timestamp > datetime('now', 'localtime', '-1 day')
     ''')
     ssh_stats['unique_ips'] = cursor.fetchone()[0]
     
     cursor.execute('''
         SELECT COUNT(*) as active_alerts
         FROM alerts
-        WHERE created_at > datetime('now', '-1 day')
+        WHERE created_at > datetime('now', 'localtime', '-1 day')
     ''')
     alerts_count = cursor.fetchone()[0]
     
@@ -318,7 +318,7 @@ def api_ssh_timeline():
             status,
             COUNT(*) as count
         FROM ssh_logs
-        WHERE timestamp > datetime('now', '-1 day')
+        WHERE timestamp > datetime('now', 'localtime', '-1 day')
         GROUP BY hour, status
         ORDER BY hour
     ''')
@@ -345,7 +345,7 @@ def api_top_ips():
             SUM(CASE WHEN status IN ('failed', 'invalid') THEN 1 ELSE 0 END) as failed,
             MAX(timestamp) as last_seen
         FROM ssh_logs
-        WHERE timestamp > datetime('now', '-7 days')
+        WHERE timestamp > datetime('now', 'localtime', '-7 days')
         AND (dns_name IS NULL OR dns_name NOT LIKE 'ec2-%.eu-central-1.compute.amazonaws.com')
         AND ip_address NOT IN {trusted_ips}
         GROUP BY ip_address
@@ -375,7 +375,7 @@ def api_trusted_hosts():
             SUM(CASE WHEN status IN ('failed', 'invalid') THEN 1 ELSE 0 END) as failed,
             MAX(timestamp) as last_seen
         FROM ssh_logs
-        WHERE timestamp > datetime('now', '-1 day')
+        WHERE timestamp > datetime('now', 'localtime', '-1 day')
         AND (
             dns_name LIKE 'ec2-%.eu-central-1.compute.amazonaws.com'
             OR ip_address IN {trusted_ips}
@@ -415,7 +415,7 @@ def api_alerts():
     cursor.execute('''
         SELECT *
         FROM alerts
-        WHERE created_at > datetime('now', '-7 days')
+        WHERE created_at > datetime('now', 'localtime', '-7 days')
         AND email_sent = 0
         ORDER BY created_at DESC
         LIMIT 50
@@ -434,7 +434,7 @@ def api_system_history():
     cursor.execute('''
         SELECT *
         FROM system_metrics
-        WHERE timestamp > datetime('now', '-1 day')
+        WHERE timestamp > datetime('now', 'localtime', '-1 day')
         ORDER BY timestamp
     ''')
     
